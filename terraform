@@ -1,0 +1,60 @@
+provider "aws" {
+  region = "ap-south-1"
+}
+
+resource "aws_s3_bucket" "new-bucket-calci" {
+  bucket = "new-bucket-calci"
+  acl    = "public-read"
+
+  website {
+    index_document = "index.html"
+  }
+}
+
+resource "aws_instance" "calci-app-ec2" {
+  ami           = "ami-0522ab6e1ddcc7055"
+  instance_type = "t2.micro"
+  key_name      = var.calculator-kp.pem
+
+  user_data = <<-EOF
+              #!/bin/bash
+              sudo yum update -y
+              sudo yum install -y nginx
+              cd /usr/share/nginx/html
+              echo "<h1>Hello from React App</h1>" > index.html
+              sudo systemctl enable nginx
+              sudo systemctl start nginx
+            EOF
+
+  tags = {
+    Name = "ReactAppServer"
+  }
+}
+
+resource "aws_autoscaling_group" "react_autoscaling_group" {
+  desired_capacity     = 2
+  max_size             = 5
+  min_size             = 1
+  launch_configuration = aws_launch_configuration.react_launch_config.id
+
+  tag {
+    key                 = "Name"
+    value               = "ReactAppAutoScalingGroup"
+    propagate_at_launch = true
+  }
+}
+
+resource "aws_launch_configuration" "react_launch_config" {
+  image_id      = "ami-0522ab6e1ddcc7055"
+  instance_type = "t2.micro"
+  key_name      = var.key_pair_name
+  user_data     = <<-EOF
+                  #!/bin/bash
+                  sudo yum update -y
+                  sudo yum install -y nginx
+                  cd /usr/share/nginx/html
+                  echo "<h1>Hello from React App</h1>" > index.html
+                  sudo systemctl enable nginx
+                  sudo systemctl start nginx
+                EOF
+}
